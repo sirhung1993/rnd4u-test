@@ -55,8 +55,63 @@ def margins = [
 // Assign the 'result' variable so the assertion at the end validates
 //
 // ---------------------------
- 
-def result = null
+
+def cat2Range = [:]
+category.each {cat -> cat2Range.put(cat[0], ["from": cat[1], "to" : cat[2]])}
+cat2Range.each{line -> println(line)}
+
+def convertedMargin=[:]
+def percent='%'
+margins.each({c -> 
+    double marginVal = c.value.endsWith(percent) ? Double.valueOf(c.value.replace(percent,'')) / 100.0 : Double.valueOf(c.value)
+    convertedMargin.put(c.key, marginVal)
+    });
+convertedMargin.each{line -> println(line)}
+
+// Assume the category is in order already
+// fixed interval for category
+// Overfit the problem here - will be solved by KDTree later if the interval is not fixed
+def interval = 25
+def categoryInterval = new String[category.size()]
+category.each({c -> 
+    int from = c[1];
+    int targetIndex = Math.floor(from / interval)
+    categoryInterval.putAt(targetIndex, c[0])
+})
+categoryInterval.each({cat -> println(cat)})
+
+def getCatType(categoryInterval, cost, interval) {
+    int index = Math.floor(cost / interval);
+    return index < categoryInterval.size() ? categoryInterval[index] : categoryInterval[categoryInterval.size()-1] 
+}
+
+def result = products.inject([:]){group2Price, ele -> 
+    def group = ele[1]
+    def cost = ele[2]
+    def cat = getCatType(categoryInterval, cost, interval)
+    def margin = convertedMargin[cat]
+    def price = cost * (1 + margin)
+    if (group2Price.containsKey(group)) {
+        group2Price.get(group).add(price)
+    } else {
+        group2Price.put(group,[price])
+    }
+    return group2Price;
+}.inject([:]){ret, entry -> 
+    def average = entry.value.inject(0.0){sum, i -> return sum + i} / entry.value.size();
+    ret.put(entry.key, average.round(1))
+    return ret
+}
+
+[
+    "G1" : 37.5,
+    "G2" : 124.5,
+    "G3" : 116.1
+].each({testEntry -> 
+        def key = testEntry.key
+        def val = testEntry.value
+        assert val == result.get(key) : "Fail here"
+    })
  
 // ---------------------------
 //
